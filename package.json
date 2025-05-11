@@ -1,21 +1,23 @@
 {
   "name": "codereplacer",
-  "displayName": "code-replacer",
+  "displayName": "Code Replacer TS",
   "description": "A code replacer extension built with TypeScript.",
   "version": "0.0.1",
   "engines": {
-    "vscode": "^1.100.0"
+    "vscode": "^1.80.0"
   },
   "categories": [
     "Other"
   ],
-  "activationEvents": [],
+  "activationEvents": [
+    "onCommand:codereplacer.openPanel"
+  ],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
       {
-        "command": "codereplacer.helloWorld",
-        "title": "Hello World"
+        "command": "codereplacer.openPanel",
+        "title": "Open Code Replacer Panel (TS)"
       }
     ]
   },
@@ -24,7 +26,7 @@
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile && npm run lint",
-    "lint": "eslint src",
+    "lint": "eslint src --ext ts",
     "test": "vscode-test"
   },
   "devDependencies": {
