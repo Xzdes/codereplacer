@@ -1,71 +1,78 @@
-# codereplacer README
+# Code Replacer TS (для VS Code)
 
-This is the README for your extension "codereplacer". After writing up a brief description, we recommend including the following sections.
+**Code Replacer TS** — это расширение для Visual Studio Code, которое предоставляет удобный интерфейс для поиска и замены фрагментов кода в активном текстовом редакторе. Оно особенно полезно для работы с многострочными блоками кода, где стандартные функции поиска и замены могут быть менее удобны.
 
-## Features
+![Пример интерфейса Code Replacer TS](images/screenshot.png) <!-- Замените на реальный скриншот вашего расширения -->
+*(Вам нужно будет создать папку `images` в корне проекта и поместить туда скриншот с именем `screenshot.png`)*
 
-Describe specific features of your extension including screenshots of your extension in action. Image paths are relative to this README file.
+## Возможности
 
-For example if there is an image subfolder under your extension project workspace:
+*   **Интерфейс в боковой панели:** Легкодоступная панель для ввода искомого и заменяемого кода.
+*   **Подсветка в реальном времени:** Введенный для поиска код подсвечивается в активном редакторе, помогая визуально проверить корректность выбора.
+*   **Замена первого вхождения:** Быстрая замена первого найденного фрагмента кода.
+*   **Автоматическое сохранение:** Файл автоматически сохраняется после успешной замены.
+*   **Нормализация текста:** Внутренняя нормализация символов новой строки и удаление лишних пробелов из поискового запроса для более надежного совпадения.
 
-\!\[feature X\]\(images/feature-x.png\)
+## Как использовать
 
-> Tip: Many popular extensions utilize animations. This is an excellent way to show off your extension! We recommend short, focused animations that are easy to follow.
+1.  **Откройте панель Code Replacer:**
+    *   Найдите иконку "Code Replacer" (обычно `$(replace-all)` - иконка с двумя стрелками) на Activity Bar (левая боковая панель VS Code).
+    *   Кликните по иконке, чтобы открыть панель расширения.
 
-## Requirements
+2.  **Работа с панелью:**
+    *   **Поле "Код для поиска":** Вставьте или введите фрагмент кода, который вы хотите найти в текущем активном файле. По мере ввода, совпадающие участки в редакторе будут подсвечиваться.
+    *   **Поле "Код для замены":** Вставьте или введите код, на который вы хотите заменить найденный фрагмент.
+    *   **Кнопка "Применить":** Нажмите эту кнопку, чтобы:
+        *   Удалить первое найденное вхождение "Кода для поиска".
+        *   Вставить на его место "Код для замены".
+        *   Сохранить измененный файл.
 
-If you have any requirements or dependencies, add a section describing those and how to install and configure them.
+## Установка
 
-## Extension Settings
+1.  Откройте **Visual Studio Code**.
+2.  Перейдите в раздел **Расширения** (View -> Extensions или `Ctrl+Shift+X`).
+3.  Найдите "Code Replacer TS" в Marketplace.
+4.  Нажмите кнопку **Install**.
 
-Include if your extension adds any VS Code settings through the `contributes.configuration` extension point.
+*(Альтернативно, если расширение не опубликовано, его можно установить из `.vsix` файла через команду `Extensions: Install from VSIX...` в палитре команд.)*
 
-For example:
+## Известные особенности и советы
 
-This extension contributes the following settings:
+*   **Фокус редактора:** Для корректной работы подсветки и замены убедитесь, что текстовый редактор с нужным файлом активен (имеет фокус) перед тем, как панель расширения попытается с ним взаимодействовать. Обычно достаточно кликнуть в область редактора.
+*   **Точность поиска:** Поиск чувствителен к точному совпадению (после внутренней нормализации). Для сложных случаев, где требуется гибкость (например, игнорирование пробелов внутри или учет различных вариантов форматирования), стандартные инструменты поиска VS Code с регулярными выражениями могут быть более подходящими.
+*   **Замена только первого вхождения:** Текущая версия заменяет только первое найденное совпадение.
 
-* `myExtension.enable`: Enable/disable this extension.
-* `myExtension.thing`: Set to `blah` to do something.
+## Сборка из исходников (для разработчиков)
 
-## Known Issues
+Если вы хотите внести изменения или собрать расширение самостоятельно:
 
-Calling out known issues can help limit users opening duplicate issues against your extension.
+1.  Клонируйте репозиторий:
+    ```bash
+    git clone https://your-repository-url/code-replacer-ts.git 
+    cd code-replacer-ts
+    ```
+    *(Замените `https://your-repository-url/code-replacer-ts.git` на реальный URL вашего репозитория, если он есть)*
 
-## Release Notes
+2.  Установите зависимости:
+    ```bash
+    npm install
+    ```
 
-Users appreciate release notes as you update your extension.
+3.  Скомпилируйте TypeScript:
+    ```bash
+    npm run compile
+    ```
+    Или запустите в режиме отслеживания изменений:
+    ```bash
+    npm run watch
+    ```
 
-### 1.0.0
+4.  Откройте проект в VS Code и нажмите `F5` для запуска отладочной сессии с расширением.
 
-Initial release of ...
+## Обратная связь и участие
 
-### 1.0.1
-
-Fixed issue #.
-
-### 1.1.0
-
-Added features X, Y, and Z.
+Если у вас есть предложения, сообщения об ошибках или вы хотите внести свой вклад, пожалуйста, создайте Issue (или Pull Request) в репозитории проекта. *(Добавьте ссылку на репозиторий, если он публичный)*
 
 ---
 
-## Following extension guidelines
-
-Ensure that you've read through the extensions guidelines and follow the best practices for creating your extension.
-
-* [Extension Guidelines](https://code.visualstudio.com/api/references/extension-guidelines)
-
-## Working with Markdown
-
-You can author your README using Visual Studio Code. Here are some useful editor keyboard shortcuts:
-
-* Split the editor (`Cmd+\` on macOS or `Ctrl+\` on Windows and Linux).
-* Toggle preview (`Shift+Cmd+V` on macOS or `Shift+Ctrl+V` on Windows and Linux).
-* Press `Ctrl+Space` (Windows, Linux, macOS) to see a list of Markdown snippets.
-
-## For more information
-
-* [Visual Studio Code's Markdown Support](http://code.visualstudio.com/docs/languages/markdown)
-* [Markdown Syntax Reference](https://help.github.com/articles/markdown-basics/)
-
-**Enjoy!**
+Надеемся, это расширение будет полезным инструментом в вашей повседневной работе!

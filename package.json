@@ -10,16 +10,28 @@
     "Other"
   ],
   "activationEvents": [
-    "onCommand:codereplacer.openPanel"
+    "onView:codereplacer.view"
   ],
   "main": "./out/extension.js",
   "contributes": {
-    "commands": [
-      {
-        "command": "codereplacer.openPanel",
-        "title": "Open Code Replacer Panel (TS)"
-      }
-    ]
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "codereplacer-container",
+          "title": "Code Replacer",
+          "icon": "$(replace-all)"
+        }
+      ]
+    },
+    "views": {
+      "codereplacer-container": [
+        {
+          "id": "codereplacer.view",
+          "name": "Code Replacer",
+          "type": "webview"
+        }
+      ]
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
@@ -30,7 +42,7 @@
     "test": "vscode-test"
   },
   "devDependencies": {
-    "@types/vscode": "^1.100.0",
+    "@types/vscode": "^1.80.0", 
     "@types/mocha": "^10.0.10",
     "@types/node": "20.x",
     "@typescript-eslint/eslint-plugin": "^8.31.1",

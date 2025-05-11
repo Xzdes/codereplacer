@@ -1,0 +1,92 @@
+/* media/webview.css */
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+    margin: 0;
+    padding: 20px;
+    color: var(--vscode-editor-foreground);
+    background-color: var(--vscode-side-bar-background, var(--vscode-editor-background)); /* Фон боковой панели или редактора */
+    display: flex;
+    flex-direction: column;
+    height: 100vh; /* Занимаем всю высоту */
+    box-sizing: border-box;
+}
+
+.container {
+    display: flex;
+    flex-direction: column;
+    gap: 15px; /* Пространство между основными блоками */
+    flex-grow: 1; /* Позволяет контейнеру расти */
+    overflow-y: auto; /* Добавляет прокрутку, если контент не помещается */
+}
+
+h2 {
+    margin-top: 0;
+    margin-bottom: 8px;
+    font-size: 1.1em;
+    font-weight: 600;
+    color: var(--vscode-text-link-foreground, var(--vscode-editor-foreground)); /* Цвет для ссылок или основной */
+}
+
+textarea {
+    width: 100%;
+    box-sizing: border-box; /* Учитываем padding и border в общей ширине/высоте */
+    padding: 10px;
+    border: 1px solid var(--vscode-input-border, #ccc);
+    border-radius: 4px;
+    background-color: var(--vscode-input-background, #fff);
+    color: var(--vscode-input-foreground, #000);
+    font-family: var(--vscode-editor-font-family, monospace); /* Шрифт как в редакторе */
+    font-size: var(--vscode-editor-font-size, 0.9em);
+    line-height: 1.5;
+    resize: vertical; /* Разрешить изменение размера только по вертикали */
+    min-height: 100px; /* Минимальная высота */
+    flex-grow: 1; /* Позволяет textarea расти, если есть место */
+}
+
+textarea:focus {
+    outline: none;
+    border-color: var(--vscode-focusBorder, #007acc); /* Цвет рамки при фокусе */
+    box-shadow: 0 0 0 1px var(--vscode-focusBorder, #007acc);
+}
+
+/* Стили для индикации ошибки (можно добавлять/удалять через JS) */
+textarea.error-input {
+    border-color: var(--vscode-inputValidation-errorBorder, red);
+    box-shadow: 0 0 0 1px var(--vscode-inputValidation-errorBorder, red);
+}
+
+
+.button-container {
+    margin-top: auto; /* Прижимает кнопку к низу, если есть свободное место */
+    padding-top: 15px; /* Отступ сверху для кнопки */
+}
+
+button {
+    width: 100%;
+    padding: 10px 15px;
+    background-color: var(--vscode-button-background, #007acc);
+    color: var(--vscode-button-foreground, white);
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1em;
+    font-weight: 500;
+    transition: background-color 0.2s ease-in-out;
+}
+
+button:hover {
+    background-color: var(--vscode-button-hoverBackground, #005a9e);
+}
+
+button:active {
+    background-color: var(--vscode-button-secondaryBackground, #004578); /* Темнее при нажатии */
+}
+
+/* Если вы хотите, чтобы поля ввода занимали примерно равное пространство: */
+.input-group {
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1; /* Каждая группа будет стараться занять равное место */
+    min-height: 0; /* Необходимо для правильной работы flex-grow с textarea */
+}
