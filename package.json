@@ -41,6 +41,11 @@
     "lint": "eslint src --ext ts",
     "test": "vscode-test"
   },
+    "repository": {
+    "type": "git",
+    "url": "https://github.com/Xzdes/codereplacer.git" 
+  },
+  "license": "MIT",
   "devDependencies": {
     "@types/vscode": "^1.80.0", 
     "@types/mocha": "^10.0.10",
