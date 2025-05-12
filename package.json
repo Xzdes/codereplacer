@@ -2,7 +2,7 @@
   "name": "codereplacer",
   "displayName": "Code Replacer",
   "description": "A code replacer extension built with TypeScript.",
-  "version": "0.1.1",
+  "version": "0.2.1",
   "engines": {
     "vscode": "^1.80.0"
   },
@@ -41,24 +41,24 @@
     "lint": "eslint src --ext ts",
     "test": "vscode-test"
   },
-    "repository": {
+  "repository": {
     "type": "git",
-    "url": "https://github.com/Xzdes/codereplacer.git" 
+    "url": "https://github.com/Xzdes/codereplacer.git"
   },
   "license": "MIT",
   "devDependencies": {
-    "@types/vscode": "^1.80.0", 
     "@types/mocha": "^10.0.10",
     "@types/node": "20.x",
+    "@types/string-similarity": "^4.0.2",
+    "@types/vscode": "^1.80.0",
     "@typescript-eslint/eslint-plugin": "^8.31.1",
     "@typescript-eslint/parser": "^8.31.1",
-    "eslint": "^9.25.1",
-    
     "@vscode/test-cli": "^0.0.10",
-    "@vscode/test-electron": "^2.5.2"
+    "@vscode/test-electron": "^2.5.2",
+    "eslint": "^9.25.1"
   },
   "dependencies": {
+    "string-similarity": "^4.0.4",
     "typescript": "^5.8.3"
-
   }
 }

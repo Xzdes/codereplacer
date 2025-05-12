@@ -67,6 +67,7 @@ export function areNodesBasicallyEqual(
     sourceFileB: ts.SourceFile | undefined,
     depth = 0,
     ignoreIdentifiers: boolean = false // Принимаем флаг для текущего уровня
+    // TODO: Добавить флаг ignoreTypes: boolean = false
 ): boolean {
     if (!nodeA && !nodeB) return true;
     if (!nodeA || !nodeB) return false;
