@@ -1,97 +1,77 @@
 // media/webview.js
 
-// Эта IIFE (Immediately Invoked Function Expression) используется для создания локальной области видимости
-// и предотвращения загрязнения глобального пространства имен.
 (function () {
-    // Получаем специальный объект API VS Code, который позволяет Webview
-    // отправлять сообщения обратно в расширение.
     const vscode = acquireVsCodeApi();
 
-    // Получаем ссылки на элементы DOM
+    // Get elements
     const findTextarea = document.getElementById('findText');
     const replaceTextarea = document.getElementById('replaceText');
     const applyButton = document.getElementById('applyButton');
 
-    let debounceTimer; // Таймер для задержки отправки сообщений при вводе
+    let debounceTimer;
+    const DEBOUNCE_DELAY = 350; // ms delay after typing stops to trigger find
 
-    // --- Обработка ввода в поле "Код для поиска" ---
+    // --- Find Text Input Handling (Debounced) ---
     if (findTextarea) {
         findTextarea.addEventListener('input', () => {
-            // "Debounce" - небольшая задержка перед отправкой сообщения.
-            // Это предотвращает отправку сообщения на каждое нажатие клавиши,
-            // улучшая производительность, если подсветка - ресурсоемкая операция.
             clearTimeout(debounceTimer);
             debounceTimer = setTimeout(() => {
+                const textToFind = findTextarea.value;
+                 // Send find command even if text is empty,
+                 // extension side will handle clearing highlights.
                 vscode.postMessage({
                     command: 'findText',
-                    text: findTextarea.value
+                    text: textToFind
                 });
-            }, 300); // Задержка в 300 миллисекунд. Можете настроить.
+            }, DEBOUNCE_DELAY);
         });
     } else {
-        console.error('Элемент #findText не найден в DOM Webview.');
+        console.error('Element #findText not found.');
     }
 
-    // --- Обработка нажатия кнопки "Применить" ---
+    // --- Apply Replace Button Handling ---
     if (applyButton) {
         applyButton.addEventListener('click', () => {
             const findText = findTextarea ? findTextarea.value : '';
-            const replaceText = replaceTextarea ? replaceTextarea.value : '';
+            const replaceText = replaceTextarea ? replaceTextarea.value : ''; // Replace text can be empty
 
-            if (!findText) {
-                // Отправляем сообщение в расширение, чтобы показать уведомление
+            // Basic validation: Find text should ideally not be empty for replacement to make sense,
+            // but the extension handles the 'no matches found' case if highlight wasn't run or found nothing.
+            if (!findText.trim()) {
                 vscode.postMessage({
                     command: 'alert',
-                    text: 'Пожалуйста, введите код для поиска в первое поле.'
+                    text: 'Пожалуйста, введите код для поиска (хотя бы структура должна быть найдена).'
                 });
-                // Можно также добавить визуальную обратную связь прямо в Webview,
-                // например, подсветить поле findTextarea красным.
                 if (findTextarea) {
                     findTextarea.focus();
-                    // Пример простой подсветки границы (требует CSS)
+                    // Optional: Add temporary error style
                     // findTextarea.classList.add('error-input');
                     // setTimeout(() => findTextarea.classList.remove('error-input'), 2000);
                 }
                 return;
             }
 
-            // Отправляем команду и данные в расширение
+            // Send command to extension
             vscode.postMessage({
                 command: 'applyReplace',
+                // Send both, though extension primarily uses replaceText and stored ranges
                 findText: findText,
                 replaceText: replaceText
             });
         });
     } else {
-        console.error('Элемент #applyButton не найден в DOM Webview.');
+        console.error('Element #applyButton not found.');
     }
 
-    // --- Опционально: начальное состояние или логика при загрузке Webview ---
-    // Например, если вы хотите автоматически очищать подсветку при открытии панели:
-    // window.addEventListener('load', () => {
-    //     vscode.postMessage({ command: 'findText', text: '' });
-    // });
-
-    // --- Опционально: прослушивание сообщений от расширения к Webview ---
-    // Это полезно, если расширение должно отправлять данные или команды в Webview.
+    // --- Optional: Handle messages from extension TO webview ---
     /*
     window.addEventListener('message', event => {
-        const message = event.data; // Данные, отправленные из расширения
-        console.log('Webview received message from extension:', message);
-
-        switch (message.command) {
-            case 'updateSomethingInWebview':
-                // const dataElement = document.getElementById('someDataElement');
-                // if (dataElement && message.data) {
-                //     dataElement.textContent = message.data;
-                // }
-                break;
-            // Добавьте другие case по необходимости
-        }
+        const message = event.data;
+        console.log('Webview received message:', message);
+        // Handle message based on message.command
     });
     */
 
-    // Сообщаем в консоль, что скрипт Webview загружен (для отладки)
-    console.log('webview.js loaded and running.');
+    console.log('webview.js loaded.');
 
 }());

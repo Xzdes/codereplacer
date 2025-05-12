@@ -56,6 +56,13 @@ textarea.error-input {
     box-shadow: 0 0 0 1px var(--vscode-inputValidation-errorBorder, red);
 }
 
+small {
+    font-size: 0.85em;
+    color: var(--vscode-descriptionForeground);
+    margin-top: 4px;
+    display: block;
+}
+
 
 .button-container {
     margin-top: auto; /* Прижимает кнопку к низу, если есть свободное место */
