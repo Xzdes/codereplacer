@@ -1,132 +1,69 @@
-# Code Replacer (для VS Code)
+# Code Replacer TS
 
-**Code Replacer** — это расширение для Visual Studio Code, предоставляющее интерфейс для поиска и замены многострочных фрагментов кода в активном текстовом редакторе.
+A Visual Studio Code extension for finding and replacing code snippets in TypeScript and TSX files based on their Abstract Syntax Tree (AST) structure, rather than simple text matching. This allows for more robust refactoring by ignoring differences in whitespace, comments, and trivial formatting.
 
+## Features
 
-## Возможности
+*   **AST-Based Search:** Finds code segments by comparing their underlying AST structure, making it resilient to formatting changes.
+*   **Sequence Matching:** Matches consecutive sequences of top-level statements/expressions provided in the "Find" input box.
+*   **Sidebar View:** Provides a dedicated view in the VS Code Activity Bar/Side Bar for inputting the code to find and the replacement code.
+*   **Live Highlighting:** Automatically highlights matching code sequences in the active editor as you type in the "Find" text area (with debouncing).
+*   **Batch Replacement:** Replaces all found occurrences with a single button click.
 
-*   **Интерфейс в боковой панели:** Удобный доступ к функциям поиска и замены.
-*   **Подсветка в реальном времени (на основе AST):** Введенный для поиска код (первый стейтмент) структурно сравнивается с кодом в активном редакторе, и совпадения подсвечиваются.
-*   **Замена первого вхождения:** Замена первого найденного фрагмента кода (текущая реализация замены использует строковый поиск).
-*   **Автоматическое сохранение:** Файл сохраняется после успешной замены.
+## Requirements
 
-## Установка
+*   [Node.js](https://nodejs.org/) (LTS version recommended)
+*   [npm](https://www.npmjs.com/) (Usually included with Node.js)
+*   [Visual Studio Code](https://code.visualstudio.com/)
 
-### Из Marketplace (если опубликовано)
-1.  Откройте Visual Studio Code.
-2.  Перейдите в раздел **Расширения** (View -> Extensions или `Ctrl+Shift+X`).
-3.  Найдите "Code Replacer TS" (или актуальное имя расширения).
-4.  Нажмите кнопку **Install**.
+## Setup From Source
 
-### Установка из файла `.vsix` (локальная сборка)
-1.  Соберите `.vsix` файл (см. раздел "Сборка расширения").
-2.  В VS Code откройте палитру команд (`Ctrl+Shift+P` или `Cmd+Shift+P`).
-3.  Введите и выберите `Extensions: Install from VSIX...`.
-4.  Укажите путь к сгенерированному `.vsix` файлу.
+Follow these steps to set up the extension from its source code:
 
-## Использование
-
-1.  **Откройте панель Code Replacer:**
-    *   Найдите иконку расширения "Code Replacer" (обычно иконка `$(replace-all)`) на Activity Bar (левая боковая панель VS Code).
-    *   Кликните по иконке, чтобы открыть панель.
-
-2.  **Работа с панелью:**
-    *   **Поле "Код для поиска":** Вставьте или введите фрагмент кода для поиска. По мере ввода, структурно совпадающие участки (на основе первого стейтмента введенного кода) в активном редакторе будут подсвечиваться.
-    *   **Поле "Код для замены":** Вставьте или введите код, на который нужно заменить найденный фрагмент.
-    *   **Кнопка "Применить":** Заменяет первое найденное вхождение (текущая замена строковая) и сохраняет файл.
-
-## Для разработчиков
-
-### Создание подобного проекта с нуля
-
-Это расширение создано с использованием TypeScript. Для создания нового проекта расширения VS Code можно использовать генератор `yo code`:
-
-1.  Установите Yeoman и генератор кода VS Code (если не установлены):
+1.  **Clone the repository:**
     ```bash
-    npm install -g yo generator-code
+    git clone Xzdes/codereplacer
     ```
-2.  Запустите генератор:
+
+2.  **Install Dependencies:**
+    Open a terminal in the project's root directory and run:
     ```bash
-    yo code
+    npm install
     ```
-3.  Следуйте инструкциям, выбрав:
-    *   `New Extension (TypeScript)`
-    *   Придумайте имя, идентификатор и описание.
-    *   Webpack: `No` (для упрощения на начальном этапе).
-    *   Пакетный менеджер: `npm` или `yarn`.
+    This command downloads and installs all the necessary dependencies listed in `package.json`, including the TypeScript compiler and VS Code extension APIs.
 
-### Структура проекта (примерная)
+    *Note: Ensure your installed version of TypeScript (check `devDependencies` in `package.json`) is compatible with the VS Code API and features used (e.g., >= v4.0.0 is recommended). If you change the version in `package.json`, run `npm install` again.*
 
-*   `src/extension.ts`: Основной файл с логикой расширения.
-*   `media/`: Папка для статических ресурсов Webview (CSS, JavaScript для Webview).
-    *   `webview.css`: Стили для Webview.
-    *   `webview.js`: JavaScript для взаимодействия с Webview.
-*   `package.json`: Манифест расширения, зависимости, скрипты.
-*   `tsconfig.json`: Конфигурация компилятора TypeScript.
-*   `.vscode/`: Папка с настройками запуска и задач для VS Code (`launch.json`, `tasks.json`).
-*   `images/`: (Опционально) Для иконок и скриншотов.
+## Running for Development
 
-### Запуск в режиме отладки
+To run the extension in a development environment:
 
-1.  Откройте папку проекта в VS Code.
-2.  Убедитесь, что установлены все зависимости:
-    ```bash
-    npm install 
-    ```
-3.  Запустите компиляцию TypeScript в режиме отслеживания (watch mode) в одном терминале:
-    ```bash
-    npm run watch
-    ```
-4.  В VS Code нажмите `F5` (или перейдите в "Run and Debug" и запустите конфигурацию "Run Extension").
-    *   Это откроет новое окно VS Code (Extension Development Host), в котором расширение будет активно.
-    *   Логи расширения можно посмотреть в консоли разработчика этого нового окна (`Developer: Toggle Developer Tools`).
+1.  Open the project folder (`code-replacer-ts`) in Visual Studio Code.
+2.  Press `F5`, or navigate to the "Run and Debug" view (usually on the left sidebar) and click the green play button for the "Run Extension" launch configuration.
+3.  This will compile the TypeScript code (if needed) and launch a new VS Code window titled "[Extension Development Host]". This new window will have your `Code Replacer TS` extension loaded and running.
+4.  You can now open TypeScript/TSX files in the "[Extension Development Host]" window and test the extension's functionality. Changes made to the extension's source code often require restarting the development host (stop debugging with `Shift+F5`, then press `F5` again) to take effect, although some changes might be picked up automatically depending on the setup.
 
-### Сборка `.vsix` файла для распространения
+## Compiling the Extension
 
-Для сборки установочного `.vsix` файла используется утилита `vsce`.
+To compile the TypeScript source code into JavaScript (typically for packaging or testing the final output without launching the debugger):
 
-1.  Установите `vsce` глобально (если не установлен):
-    ```bash
-    npm install -g vsce
-    ```
-2.  Убедитесь, что файл `package.json` содержит необходимые поля (`name`, `version`, `publisher`, `description`, `engines.vscode` и т.д.). Для поля `publisher` потребуется имя издателя, зарегистрированное в Azure DevOps для публикации в Marketplace. Для локальной сборки можно использовать любое значение.
-3.  Создайте файл `.vscodeignore` в корне проекта, чтобы исключить ненужные файлы (например, `node_modules/`, `src/`, `.git/`) из пакета. Пример:
-    ```
-    .vscode/**
-    node_modules/**
-    src/**
-    *.tsbuildinfo
-    .gitignore
-    ```
-4.  Скомпилируйте TypeScript:
+1.  Open a terminal in the project's root directory.
+2.  Run the compile script defined in your `package.json`. Based on your previous commands, this is likely:
     ```bash
     npm run compile
     ```
-5.  Соберите пакет:
-    ```bash
-    vsce package
-    ```
-    Эта команда создаст файл вида `имя-расширения-версия.vsix` в корне проекта.
+3.  This command usually executes `tsc -p ./`, which invokes the TypeScript compiler (`tsc`) using the project's `tsconfig.json` configuration file.
+4.  The compiled JavaScript files are typically placed in an output directory specified in `tsconfig.json` (commonly named `out` or `dist`).
 
-### Важные файлы и их роли (в контексте данного расширения)
+## Usage
 
-*   **`package.json`**:
-    *   `activationEvents`: Установлено на `"onView:codereplacer.view"` для активации при открытии боковой панели.
-    *   `contributes.viewsContainers` и `contributes.views`: Определяют иконку в Activity Bar и саму Webview-панель.
-    *   `main`: Указывает на скомпилированный `./out/extension.js`.
-*   **`src/extension.ts`**:
-    *   Функция `activate`: Регистрирует `CodeReplacerViewProvider`.
-    *   Класс `CodeReplacerViewProvider`: Реализует `vscode.WebviewViewProvider` для управления содержимым и логикой Webview в боковой панели.
-        *   `resolveWebviewView()`: Создает и настраивает Webview, загружает HTML.
-        *   `_getHtmlForWebview()`: Генерирует HTML для Webview.
-        *   Обработчик `onDidReceiveMessage`: Принимает сообщения от JavaScript Webview.
-        *   `highlightTextInEditor()`: Основная логика поиска и подсветки на основе AST.
-        *   `areNodesBasicallyEqual()`: Функция для структурного сравнения AST-узлов.
-        *   `replaceTextInEditor_WithStringLogic()`: Текущая (строковая) логика замены.
-*   **`media/webview.js`**: JavaScript, работающий внутри Webview, отправляет сообщения (`postMessage`) в расширение при вводе текста или нажатии кнопок.
-*   **`media/webview.css`**: Стили для интерфейса Webview.
+1.  Open the "Code Replacer TS" view. Look for its icon in the VS Code Activity Bar (the far left or right bar) or check the Side Bar panels.
+2.  Ensure a TypeScript (`.ts`) or TSX (`.tsx`) file is the active editor.
+3.  In the "Code to Find (AST Sequence Match)" text area within the extension's view, paste the code snippet (one or more statements/expressions) you want to find.
+4.  As you type, the extension will parse the code and highlight any matching sequences found in the active editor based on their AST structure.
+5.  In the "Replacement Code" text area, paste the code that should replace the found matches.
+6.  Click the "Replace Found Matches" button to perform the replacement across all highlighted occurrences.
 
-## Лицензия
+## License
 
-[MIT] 
-
+**MIT License**

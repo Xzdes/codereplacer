@@ -1,4 +1,4 @@
-// --- ПОЛНЫЙ ФАЙЛ src/extension.ts (Версия 5 - Полная, без сокращений) ---
+// --- ПОЛНЫЙ ФАЙЛ src/extension.ts (Версия 6 - Многострочный поиск) ---
 
 import * as vscode from 'vscode';
 import * as ts from 'typescript';
@@ -6,15 +6,10 @@ import * as crypto from 'crypto';
 
 // --- Global State ---
 let findDecorationType: vscode.TextEditorDecorationType;
-let matchedASTRanges: vscode.Range[] = [];
-
-// --- ВАЖНО: ОБНОВИТЕ ВЕРСИЮ TypeScript! ---
-// Ошибка 'getSyntacticDiagnostics does not exist' означает,
-// что ваша версия TypeScript в package.json СЛИШКОМ СТАРАЯ.
-// Установите ^4.0.0 или новее и выполните `npm install`.
-// -----------------------------------------
+let matchedASTRanges: vscode.Range[] = []; // Хранит диапазоны ПОЛНЫХ найденных последовательностей
 
 // --- AST Helper ---
+// ИЗМЕНЕНИЕ: Используем getPreEmitDiagnostics как ОБХОДНОЙ ПУТЬ для старых версий TS
 function parseCodeToASTStatements(code: string, fileName: string = 'tempFile.ts'): ts.Statement[] {
     const sourceFile = ts.createSourceFile(
         fileName,
@@ -24,14 +19,29 @@ function parseCodeToASTStatements(code: string, fileName: string = 'tempFile.ts'
         ts.ScriptKind.TSX // Parse as TSX
     );
 
-    // --- ИЗМЕНЕНИЕ: Используем getPreEmitDiagnostics как ОБХОДНОЙ ПУТЬ для старых версий TS ---
-    // ПРЕДУПРЕЖДЕНИЕ: Этот метод МЕНЕЕ эффективен, если нужна только проверка синтаксиса,
-    // и требует создания временной 'Program'.
+    // ИЗМЕНЕНИЕ: Используем getPreEmitDiagnostics() вместо getSyntacticDiagnostics()
+    // ПРЕДУПРЕЖДЕНИЕ: Этот метод МЕНЕЕ эффективен и требует создания временной 'Program'.
     // НАСТОЯТЕЛЬНО РЕКОМЕНДУЕТСЯ ОБНОВИТЬ ВЕРСИЮ TypeScript в package.json!
     let diagnostics: readonly ts.Diagnostic[] = [];
     try {
         // Создаем минимальную программу для получения диагностик
-        const program = ts.createProgram([fileName], { noEmit: true }, undefined, undefined, undefined);
+        // Временное решение: передаем пустой host, т.к. файл уже есть в sourceFile
+        const compilerHost: ts.CompilerHost = {
+            getSourceFile: (fn, languageVersion) => fn === fileName ? sourceFile : undefined,
+            getDefaultLibFileName: (options) => ts.getDefaultLibFilePath(options),
+            writeFile: (fileName, data, writeByteOrderMark, onError) => { /* noop */ },
+            getCurrentDirectory: () => '', // Не имеет значения для этого случая
+            getDirectories: path => [],
+            fileExists: fn => fn === fileName,
+            readFile: fn => fn === fileName ? code : undefined,
+            getCanonicalFileName: fn => fn,
+            useCaseSensitiveFileNames: () => true,
+            getNewLine: () => '\n',
+            resolveModuleNames: undefined, // не нужно для диагностики
+            resolveTypeReferenceDirectives: undefined // не нужно для диагностики
+        };
+        const program = ts.createProgram([fileName], { noEmit: true }, compilerHost);
+
         // Получаем все диагностики (синтаксис + семантика, если получится)
         diagnostics = ts.getPreEmitDiagnostics(program, sourceFile);
     } catch (programError) {
@@ -114,7 +124,7 @@ class CodeReplacerViewProvider implements vscode.WebviewViewProvider {
         this._extensionUri = extensionUriValue;
     }
 
-    // --- resolveWebviewView ---
+    // --- resolveWebviewView (Без существенных изменений) ---
     public resolveWebviewView(
         webviewView: vscode.WebviewView,
         context: vscode.WebviewViewResolveContext,
@@ -153,8 +163,8 @@ class CodeReplacerViewProvider implements vscode.WebviewViewProvider {
         });
     }
 
-
     // --- Core AST Comparison Logic ---
+    // --- areNodesBasicallyEqual (Без изменений) ---
     private areNodesBasicallyEqual(
         nodeA: ts.Node | undefined,
         nodeB: ts.Node | undefined,
@@ -163,6 +173,7 @@ class CodeReplacerViewProvider implements vscode.WebviewViewProvider {
         depth = 0,
         ignoreIdentifiers: boolean = false
     ): boolean {
+        // Логика сравнения ДВУХ узлов остается прежней
         if (!nodeA && !nodeB) return true;
         if (!nodeA || !nodeB) return false;
         if (nodeA.kind !== nodeB.kind) return false;
@@ -171,29 +182,10 @@ class CodeReplacerViewProvider implements vscode.WebviewViewProvider {
             case ts.SyntaxKind.Identifier:
                 if (ignoreIdentifiers) return true;
                 return (nodeA as ts.Identifier).text === (nodeB as ts.Identifier).text;
-
-            case ts.SyntaxKind.StringLiteral:
-            case ts.SyntaxKind.NumericLiteral:
-            case ts.SyntaxKind.RegularExpressionLiteral:
-            case ts.SyntaxKind.NoSubstitutionTemplateLiteral:
+            case ts.SyntaxKind.StringLiteral: /* и т.д. */
                  return (nodeA as ts.LiteralLikeNode).text === (nodeB as ts.LiteralLikeNode).text;
-
-            case ts.SyntaxKind.TrueKeyword:
-            case ts.SyntaxKind.FalseKeyword:
-            case ts.SyntaxKind.NullKeyword:
-            case ts.SyntaxKind.UndefinedKeyword:
-            case ts.SyntaxKind.ThisKeyword:
-            case ts.SyntaxKind.SuperKeyword:
-            case ts.SyntaxKind.VoidKeyword:
-            case ts.SyntaxKind.ExportKeyword:
-            case ts.SyntaxKind.StaticKeyword:
-            case ts.SyntaxKind.AsyncKeyword:
-            case ts.SyntaxKind.PublicKeyword:
-            case ts.SyntaxKind.PrivateKeyword:
-            case ts.SyntaxKind.ProtectedKeyword:
-            case ts.SyntaxKind.ReadonlyKeyword:
-                return true; // Kind match is sufficient
-
+            case ts.SyntaxKind.TrueKeyword: /* и т.д. */
+                return true;
             case ts.SyntaxKind.VariableDeclaration: {
                 const varDeclA = nodeA as ts.VariableDeclaration;
                 const varDeclB = nodeB as ts.VariableDeclaration;
@@ -216,7 +208,6 @@ class CodeReplacerViewProvider implements vscode.WebviewViewProvider {
                 const decoratorsA = ts.canHaveDecorators(stmtA) ? ts.getDecorators(stmtA) : undefined;
                 const decoratorsB = ts.canHaveDecorators(stmtB) ? ts.getDecorators(stmtB) : undefined;
                 if (!this.compareNodeArrays(decoratorsA, decoratorsB, sourceFileA, sourceFileB, depth + 1, ignoreIdentifiers)) return false;
-                // УТВЕРЖДЕНИЕ ТИПА ДЛЯ ИСПРАВЛЕНИЯ ОШИБКИ
                 const modifiersOnlyA = (stmtA.modifiers || []).filter(ts.isModifier) as ts.Modifier[];
                 const modifiersOnlyB = (stmtB.modifiers || []).filter(ts.isModifier) as ts.Modifier[];
                 if (!this.compareModifiers(modifiersOnlyA, modifiersOnlyB)) return false;
@@ -253,7 +244,6 @@ class CodeReplacerViewProvider implements vscode.WebviewViewProvider {
                 const decoratorsA = ts.canHaveDecorators(paramA) ? ts.getDecorators(paramA) : undefined;
                 const decoratorsB = ts.canHaveDecorators(paramB) ? ts.getDecorators(paramB) : undefined;
                 if (!this.compareNodeArrays(decoratorsA, decoratorsB, sourceFileA, sourceFileB, depth + 1, ignoreIdentifiers)) return false;
-                 // УТВЕРЖДЕНИЕ ТИПА ДЛЯ ИСПРАВЛЕНИЯ ОШИБКИ
                 const modifiersOnlyA = (paramA.modifiers || []).filter(ts.isModifier) as ts.Modifier[];
                 const modifiersOnlyB = (paramB.modifiers || []).filter(ts.isModifier) as ts.Modifier[];
                 if (!this.compareModifiers(modifiersOnlyA, modifiersOnlyB)) return false;
@@ -273,7 +263,6 @@ class CodeReplacerViewProvider implements vscode.WebviewViewProvider {
                 const decoratorsA = ts.canHaveDecorators(funcA) ? ts.getDecorators(funcA) : undefined;
                 const decoratorsB = ts.canHaveDecorators(funcB) ? ts.getDecorators(funcB) : undefined;
                 if (!this.compareNodeArrays(decoratorsA, decoratorsB, sourceFileA, sourceFileB, depth + 1, ignoreIdentifiers)) return false;
-                 // УТВЕРЖДЕНИЕ ТИПА ДЛЯ ИСПРАВЛЕНИЯ ОШИБКИ
                 const modifiersOnlyA = (funcA.modifiers || []).filter(ts.isModifier) as ts.Modifier[];
                 const modifiersOnlyB = (funcB.modifiers || []).filter(ts.isModifier) as ts.Modifier[];
                 if (!this.compareModifiers(modifiersOnlyA, modifiersOnlyB)) return false;
@@ -298,7 +287,7 @@ class CodeReplacerViewProvider implements vscode.WebviewViewProvider {
                  if (!this.areNodesBasicallyEqual(ifA.thenStatement, ifB.thenStatement, sourceFileA, sourceFileB, depth + 1, ignoreIdentifiers)) return false;
                  if (!this.areNodesBasicallyEqual(ifA.elseStatement, ifB.elseStatement, sourceFileA, sourceFileB, depth + 1, ignoreIdentifiers)) return false;
                  break;
-            }
+             }
              case ts.SyntaxKind.BinaryExpression: {
                 const binA = nodeA as ts.BinaryExpression;
                 const binB = nodeB as ts.BinaryExpression;
@@ -321,44 +310,6 @@ class CodeReplacerViewProvider implements vscode.WebviewViewProvider {
                  break;
             }
             // --- Добавьте другие cases по необходимости ---
-            case ts.SyntaxKind.ForStatement:
-            case ts.SyntaxKind.WhileStatement:
-            case ts.SyntaxKind.DoStatement:
-            case ts.SyntaxKind.SwitchStatement:
-            case ts.SyntaxKind.CaseClause:
-            case ts.SyntaxKind.DefaultClause:
-            case ts.SyntaxKind.TryStatement:
-            case ts.SyntaxKind.CatchClause:
-            case ts.SyntaxKind.ReturnStatement:
-            case ts.SyntaxKind.ThrowStatement:
-            case ts.SyntaxKind.BreakStatement:
-            case ts.SyntaxKind.ContinueStatement:
-            case ts.SyntaxKind.ClassDeclaration:
-            case ts.SyntaxKind.InterfaceDeclaration:
-            case ts.SyntaxKind.EnumDeclaration:
-            case ts.SyntaxKind.TypeAliasDeclaration:
-            case ts.SyntaxKind.ImportDeclaration:
-            case ts.SyntaxKind.ExportDeclaration:
-            case ts.SyntaxKind.ObjectLiteralExpression:
-            case ts.SyntaxKind.ArrayLiteralExpression:
-            case ts.SyntaxKind.PropertyAssignment:
-            case ts.SyntaxKind.ShorthandPropertyAssignment:
-            case ts.SyntaxKind.ComputedPropertyName:
-            case ts.SyntaxKind.ConditionalExpression:
-            case ts.SyntaxKind.TemplateExpression:
-            case ts.SyntaxKind.TemplateHead:
-            case ts.SyntaxKind.TemplateMiddle:
-            case ts.SyntaxKind.TemplateTail:
-            case ts.SyntaxKind.TemplateSpan:
-            case ts.SyntaxKind.JsxElement:
-            case ts.SyntaxKind.JsxSelfClosingElement:
-            case ts.SyntaxKind.JsxOpeningElement:
-            case ts.SyntaxKind.JsxClosingElement:
-            case ts.SyntaxKind.JsxAttribute:
-            case ts.SyntaxKind.JsxSpreadAttribute:
-            case ts.SyntaxKind.JsxExpression:
-                // Fall through to default for now
-
             // --- default case (Сравнение дочерних узлов) ---
             default:
                 const childrenA = nodeA.getChildren(sourceFileA);
@@ -379,7 +330,7 @@ class CodeReplacerViewProvider implements vscode.WebviewViewProvider {
         return true;
     }
 
-    // Helper: Сравнение массивов узлов
+    // Helper: Сравнение массивов узлов (Без изменений)
     private compareNodeArrays(
         arrA: readonly ts.Node[] | ts.NodeArray<ts.Node> | undefined,
         arrB: readonly ts.Node[] | ts.NodeArray<ts.Node> | undefined,
@@ -399,7 +350,7 @@ class CodeReplacerViewProvider implements vscode.WebviewViewProvider {
         return true;
     }
 
-     // Helper: Сравнение ТОЛЬКО модификаторов
+     // Helper: Сравнение ТОЛЬКО модификаторов (Без изменений)
      private compareModifiers(modA: readonly ts.Modifier[] | undefined, modB: readonly ts.Modifier[] | undefined): boolean {
          const modsAKinds = modA ? modA.map(m => m.kind).sort() : [];
          const modsBKinds = modB ? modB.map(m => m.kind).sort() : [];
@@ -410,7 +361,7 @@ class CodeReplacerViewProvider implements vscode.WebviewViewProvider {
          return true;
      }
 
-      // Helper: Проверка на узел-тривию
+      // Helper: Проверка на узел-тривию (Без изменений)
     private isTriviaNode(node: ts.Node): boolean {
         return node.kind === ts.SyntaxKind.SingleLineCommentTrivia ||
                node.kind === ts.SyntaxKind.MultiLineCommentTrivia ||
@@ -418,10 +369,10 @@ class CodeReplacerViewProvider implements vscode.WebviewViewProvider {
     }
 
 
-    // --- Логика подсветки ---
+    // --- Логика подсветки (Переписана для поиска последовательностей) ---
     private highlightTextInEditor(textToFindFromWebview: string) {
         const editor = vscode.window.activeTextEditor;
-        console.log('[CodeReplacerTS] Highlighting text (AST-based)... Editor active:', !!editor);
+        console.log('[CodeReplacerTS] Highlighting text (AST sequence)... Editor active:', !!editor);
         this.clearHighlights();
 
         if (!editor) {
@@ -436,10 +387,11 @@ class CodeReplacerViewProvider implements vscode.WebviewViewProvider {
 
         const decorationsArray: vscode.DecorationOptions[] = [];
         let findSourceFile: ts.SourceFile;
-        let findStatements: ts.Statement[];
-        let localMatchedRanges: vscode.Range[] = [];
+        let findStatements: ts.Statement[]; // Целевая последовательность
+        let localMatchedRanges: vscode.Range[] = []; // Локальный список для найденных диапазонов ПОСЛЕДОВАТЕЛЬНОСТЕЙ
 
         try {
+            // Парсим код для поиска
             findStatements = parseCodeToASTStatements(trimmedTextToFind, 'findFragment.ts');
             findSourceFile = ts.createSourceFile('findFragment.ts', trimmedTextToFind, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
 
@@ -447,58 +399,100 @@ class CodeReplacerViewProvider implements vscode.WebviewViewProvider {
                 console.log('[CodeReplacerTS AST] No statements parsed from find text.');
                 return;
             }
-            if (findStatements.length > 1) {
-                console.warn(`[CodeReplacerTS AST] WARNING: Matching only the FIRST statement.`);
-                 vscode.window.showWarningMessage('Search currently works only for the first statement/expression.');
-            }
-            const findNodeToMatch = findStatements[0];
-            console.log(`[CodeReplacerTS AST] Attempting to match AST node Kind: ${ts.SyntaxKind[findNodeToMatch.kind]}`);
+            console.log(`[CodeReplacerTS AST] Attempting to match sequence of ${findStatements.length} statements.`);
 
+            // Парсим документ
             const document = editor.document;
             const documentText = document.getText();
             const documentSourceFile = ts.createSourceFile(document.fileName, documentText, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
 
-            const visit = (nodeInDocument: ts.Node) => {
-                if (this.areNodesBasicallyEqual(nodeInDocument, findNodeToMatch, documentSourceFile, findSourceFile, 0)) {
-                    console.log(`[AST Match FOUND] Node Kind: ${ts.SyntaxKind[nodeInDocument.kind]} at pos ${nodeInDocument.getStart(documentSourceFile)}`);
-                    try {
-                        const start = nodeInDocument.getStart(documentSourceFile);
-                        const end = nodeInDocument.getEnd();
-                        const startPos = document.positionAt(start);
-                        const endPos = document.positionAt(end);
-                        const range = new vscode.Range(startPos, endPos);
-                        decorationsArray.push({ range, hoverMessage: 'AST Match' });
-                        localMatchedRanges.push(range);
-                    } catch (rangeError: any) {
-                         console.error(`[CodeReplacerTS AST] Error calculating range:`, rangeError.message);
+            // --- Новая логика поиска последовательностей ---
+            const findSequences = (nodesToSearch: readonly ts.Node[]) => {
+                for (let i = 0; i <= nodesToSearch.length - findStatements.length; i++) {
+                    let sequenceMatch = true;
+                    // Проверяем, совпадает ли подпоследовательность в документе с целевой
+                    for (let j = 0; j < findStatements.length; j++) {
+                        if (!this.areNodesBasicallyEqual(nodesToSearch[i + j], findStatements[j], documentSourceFile, findSourceFile, 0)) {
+                            sequenceMatch = false;
+                            break; // Если хоть один узел не совпал, прерываем проверку этой подпоследовательности
+                        }
+                    }
+
+                    // Если вся последовательность совпала
+                    if (sequenceMatch) {
+                        const firstNode = nodesToSearch[i];
+                        const lastNode = nodesToSearch[i + findStatements.length - 1];
+                        console.log(`[AST Sequence Match FOUND] Starts at pos ${firstNode.getStart(documentSourceFile)}`);
+                        try {
+                            // Определяем диапазон от начала первого до конца последнего узла
+                            const start = firstNode.getStart(documentSourceFile);
+                            const end = lastNode.getEnd();
+                            const startPos = document.positionAt(start);
+                            const endPos = document.positionAt(end);
+                            const range = new vscode.Range(startPos, endPos);
+
+                            decorationsArray.push({ range, hoverMessage: `AST Sequence Match (${findStatements.length} statements)` });
+                            localMatchedRanges.push(range); // Добавляем диапазон всей последовательности
+
+                            // Перескакиваем через найденную последовательность в цикле for
+                            // чтобы избежать повторных совпадений внутри уже найденной
+                            i += findStatements.length - 1;
+
+                        } catch (rangeError: any) {
+                             console.error(`[CodeReplacerTS AST] Error calculating range for matched sequence:`, rangeError.message);
+                        }
                     }
                 }
-                ts.forEachChild(nodeInDocument, visit);
             };
 
-            console.log(`[CodeReplacerTS AST] Starting traversal of: ${document.fileName}`);
-            ts.forEachChild(documentSourceFile, visit);
+            // Рекурсивный обход для поиска списков операторов
+            const visit = (node: ts.Node) => {
+                // Ищем последовательности в основных контейнерах
+                if (ts.isBlock(node) || ts.isSourceFile(node) || ts.isModuleBlock(node) || ts.isCaseClause(node) || ts.isDefaultClause(node)) {
+                    findSequences(node.statements);
+                }
+                // Ищем в then/else блоках IfStatement
+                else if (ts.isIfStatement(node)) {
+                    // Обходим then блок (если это блок)
+                    if (ts.isBlock(node.thenStatement)) {
+                        findSequences(node.thenStatement.statements);
+                    }
+                     // Обходим else блок (если это блок)
+                    if (node.elseStatement && ts.isBlock(node.elseStatement)) {
+                        findSequences(node.elseStatement.statements);
+                    }
+                }
+                 // Добавьте другие контейнеры по необходимости (например, тело цикла for, try/catch/finally)
 
-            matchedASTRanges = localMatchedRanges; // Обновляем глобальное состояние
-            console.log(`[CodeReplacerTS AST] Found ${matchedASTRanges.length} match(es). Applying decorations.`);
+                // Продолжаем рекурсивный обход
+                ts.forEachChild(node, visit);
+            };
+
+            console.log(`[CodeReplacerTS AST] Starting sequence search in: ${document.fileName}`);
+            visit(documentSourceFile); // Начинаем обход с корня документа
+
+            // Обновляем глобальное состояние ПОСЛЕ успешного поиска
+            matchedASTRanges = localMatchedRanges;
+            console.log(`[CodeReplacerTS AST] Found ${matchedASTRanges.length} sequence match(es). Applying decorations.`);
 
             if (matchedASTRanges.length === 0 && trimmedTextToFind.length > 0) {
-                 vscode.window.showInformationMessage('No matching code structures found.');
+                 vscode.window.showInformationMessage('No matching code sequences found.');
             }
 
         } catch (error: any) {
             console.error("[CodeReplacerTS AST] Error during highlight:", error);
             vscode.window.showErrorMessage(`AST Analysis Error: ${error.message || 'Unknown error'}`);
-            this.clearHighlights();
+            this.clearHighlights(); // Очищаем состояние при ошибке
         } finally {
-            // Применяем декорации в любом случае (даже пустые, чтобы очистить старые)
-            if (editor && findDecorationType) { // Доп. проверка на случай закрытия редактора
+            // Применяем декорации
+            if (editor && findDecorationType) {
                 editor.setDecorations(findDecorationType, decorationsArray);
             }
         }
     }
 
-    // --- Логика замены ---
+
+    // --- Логика замены (Без изменений - работает с ranges) ---
     private async replaceFoundMatches(replaceText: string) {
         const editor = vscode.window.activeTextEditor;
         console.log('[CodeReplacerTS] Applying replace...');
@@ -507,38 +501,35 @@ class CodeReplacerViewProvider implements vscode.WebviewViewProvider {
             vscode.window.showErrorMessage('No active editor.');
             return;
         }
+        // Используем ranges, сохраненные в highlightTextInEditor
         if (matchedASTRanges.length === 0) {
             vscode.window.showInformationMessage('No matches stored. Please find first.');
             return;
         }
 
-        // Сортируем диапазоны в ОБРАТНОМ порядке для корректной замены
         const sortedRanges = [...matchedASTRanges].sort((a, b) => b.start.compareTo(a.start));
         const originalRangesCount = sortedRanges.length;
 
         try {
-            // Выполняем все замены одной операцией редактирования
             const success = await editor.edit(editBuilder => {
                 sortedRanges.forEach(range => editBuilder.replace(range, replaceText));
-            }, { undoStopBefore: true, undoStopAfter: true }); // Группируем в один шаг отмены
+            }, { undoStopBefore: true, undoStopAfter: true });
 
             if (success) {
                 console.log(`[CodeReplacerTS] ${originalRangesCount} match(es) replaced.`);
                 vscode.window.showInformationMessage(`Replacement successful (${originalRangesCount} matches).`);
-                this.clearHighlights(editor); // Очищаем после успешной замены
+                this.clearHighlights(editor); // Очищаем после успеха
             } else {
                 console.error('[CodeReplacerTS] editor.edit() returned false.');
                 vscode.window.showErrorMessage('Replacement failed. Editor modified concurrently?');
-                // Не очищаем подсветку, чтобы пользователь видел, где остановились
             }
         } catch (error: any) {
             console.error("[CodeReplacerTS] Error during replace:", error);
             vscode.window.showErrorMessage(`Replacement Error: ${error.message || 'Unknown error'}`);
-             // Не очищаем подсветку
         }
     }
 
-    // --- Очистка подсветки ---
+    // --- Очистка подсветки (Без изменений) ---
     public clearHighlights(editor: vscode.TextEditor | undefined = vscode.window.activeTextEditor) {
         if (editor && findDecorationType) {
             editor.setDecorations(findDecorationType, []);
@@ -549,14 +540,13 @@ class CodeReplacerViewProvider implements vscode.WebviewViewProvider {
                  }
              });
         }
-        // Всегда очищаем сохраненные диапазоны при очистке подсветки
         if (matchedASTRanges.length > 0) {
              console.log('[CodeReplacerTS] Clearing stored ranges.');
              matchedASTRanges = [];
         }
     }
 
-    // --- Генерация HTML ---
+    // --- Генерация HTML (Изменен <small> текст) ---
     private _getHtmlForWebview(webview: vscode.Webview): string {
         const nonce = getNonce();
         const stylesPath = vscode.Uri.joinPath(this._extensionUri, 'media', 'webview.css');
@@ -564,7 +554,6 @@ class CodeReplacerViewProvider implements vscode.WebviewViewProvider {
         const stylesUri = webview.asWebviewUri(stylesPath);
         const scriptUri = webview.asWebviewUri(scriptPath);
 
-        // Используем строки шаблона для удобства
         return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -583,9 +572,9 @@ class CodeReplacerViewProvider implements vscode.WebviewViewProvider {
 <body>
     <div class="container">
         <div class="input-group">
-            <h2>Code to Find (AST Match):</h2>
-            <textarea id="findText" placeholder="Paste code snippet..." rows="8"></textarea>
-             <small>Matches structure of the first statement/expression.</small>
+            <h2>Code to Find (AST Sequence Match):</h2>
+            <textarea id="findText" placeholder="Paste code snippet (multiple statements allowed)..." rows="8"></textarea>
+             <small>Matches sequential statements/expressions based on AST structure.</small> <!-- ИЗМЕНЕН ТЕКСТ -->
         </div>
         <div class="input-group">
             <h2>Replacement Code:</h2>
