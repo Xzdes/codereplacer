@@ -29,20 +29,21 @@ function normalizeText(text: string, trimEdges: boolean = true): string {
 export function activate(context: vscode.ExtensionContext) {
     console.log('[CodeReplacerTS] Extension "codereplacer" is now active!');
 
-    const testCodeForParser = `
-        function hello(name: string) { console.log("Hello, " + name); }
-        const x = 10;
-        class MyClass { constructor() {} }
-    `;
-    try {
-        const astStatements = parseCodeToASTStatements(testCodeForParser, 'parserTest.ts');
-        console.log(`[CodeReplacerTS AST Test] Parsed ${astStatements.length} statements from testCodeForParser.`);
-        astStatements.forEach((stmt, index) => {
-            console.log(`  Statement ${index + 1} Kind: ${ts.SyntaxKind[stmt.kind]} (Value: ${stmt.kind})`);
-        });
-    } catch (e) {
-        console.error("[CodeReplacerTS AST Test] Error parsing test code:", e);
-    }
+    // Тестовый блок AST парсера (можно оставить для проверок)
+    // const testCodeForParser = `
+    //     function hello(name: string) { console.log("Hello, " + name); }
+    //     const x = 10;
+    //     class MyClass { constructor() {} }
+    // `;
+    // try {
+    //     const astStatements = parseCodeToASTStatements(testCodeForParser, 'parserTest.ts');
+    //     console.log(`[CodeReplacerTS AST Test] Parsed ${astStatements.length} statements from testCodeForParser.`);
+    //     astStatements.forEach((stmt, index) => {
+    //         console.log(`  Statement ${index + 1} Kind: ${ts.SyntaxKind[stmt.kind]} (Value: ${stmt.kind})`);
+    //     });
+    // } catch (e) {
+    //     console.error("[CodeReplacerTS AST Test] Error parsing test code:", e);
+    // }
 
     findDecorationType = vscode.window.createTextEditorDecorationType({
         backgroundColor: 'rgba(255, 255, 0, 0.3)',
@@ -68,8 +69,8 @@ class CodeReplacerViewProvider implements vscode.WebviewViewProvider {
 
     public resolveWebviewView(
         webviewView: vscode.WebviewView,
-        context: vscode.WebviewViewResolveContext,
-        _token: vscode.CancellationToken,
+        context: vscode.WebviewViewResolveContext, // Вернули параметры
+        _token: vscode.CancellationToken,         // Вернули параметры
     ) {
         this._view = webviewView;
         webviewView.webview.options = {
@@ -89,7 +90,7 @@ class CodeReplacerViewProvider implements vscode.WebviewViewProvider {
                     return;
                 case 'applyReplace':
                     if (typeof message.findText === 'string' && typeof message.replaceText === 'string') {
-                        await this.replaceTextInEditor_WithStringLogic(message.findText, message.replaceText); // TODO: Convert to AST logic
+                        await this.replaceTextInEditor_WithStringLogic(message.findText, message.replaceText); 
                     }
                     return;
                 case 'alert':
@@ -124,13 +125,12 @@ class CodeReplacerViewProvider implements vscode.WebviewViewProvider {
 
         if (nodeA.kind === ts.SyntaxKind.FunctionDeclaration && nodeB.kind === ts.SyntaxKind.FunctionDeclaration) {
             console.log(`${indent}>>> Comparing FunctionDeclarations <<<`);
-            if (sourceFileA) try { console.log(`${indent}Doc Func Text (approx): "${nodeA.getText(sourceFileA).substring(0, 150).replace(/\n/g, "\\n")}"`); } catch(e){}
-            if (sourceFileB) try { console.log(`${indent}Find Func Text (approx): "${nodeB.getText(sourceFileB).substring(0, 150).replace(/\n/g, "\\n")}"`); } catch(e){}
+            if (sourceFileA && nodeA) try { console.log(`${indent}Doc Func Text (approx): "${nodeA.getText(sourceFileA).substring(0, 200).replace(/\n/g, "\\n")}"`); } catch(e){}
+            if (sourceFileB && nodeB) try { console.log(`${indent}Find Func Text (approx): "${nodeB.getText(sourceFileB).substring(0, 200).replace(/\n/g, "\\n")}"`); } catch(e){}
+        } else {
+             console.log(`${indent}[AST Compare Attempt] DocNode Kind: ${ts.SyntaxKind[nodeA.kind]}, FindNode Kind: ${ts.SyntaxKind[nodeB.kind]}`);
         }
-        // else { // Общий лог для других типов узлов
-        //     console.log(`${indent}[AST Compare Attempt] DocNode Kind: ${ts.SyntaxKind[nodeA.kind]}, FindNode Kind: ${ts.SyntaxKind[nodeB.kind]}`);
-        // }
-
+        
         if (nodeA.kind !== nodeB.kind) {
             console.log(`${indent}[AST Compare FAIL] Kind mismatch: DocNode=${ts.SyntaxKind[nodeA.kind]} (${nodeA.kind}) vs FindNode=${ts.SyntaxKind[nodeB.kind]} (${nodeB.kind})`);
             return false;
@@ -160,6 +160,7 @@ class CodeReplacerViewProvider implements vscode.WebviewViewProvider {
             case ts.SyntaxKind.NullKeyword:
             case ts.SyntaxKind.ThisKeyword:
             case ts.SyntaxKind.SuperKeyword:
+                console.log(`${indent}[AST Compare OK] Simple Keyword match: ${ts.SyntaxKind[nodeA.kind]}`);
                 break; 
 
             case ts.SyntaxKind.VariableDeclaration: {
@@ -244,54 +245,54 @@ class CodeReplacerViewProvider implements vscode.WebviewViewProvider {
                 break;
             }
             case ts.SyntaxKind.FunctionDeclaration: {
-                const funcA = nodeA as ts.FunctionDeclaration;
-                const funcB = nodeB as ts.FunctionDeclaration;
+                const funcA = nodeA as ts.FunctionDeclaration; // DocNode
+                const funcB = nodeB as ts.FunctionDeclaration; // FindNode
                 console.log(`${indent}  [FunctionDeclaration Compare] Comparing names...`);
                 if (!this.areNodesBasicallyEqual(funcA.name, funcB.name, sourceFileA, sourceFileB, depth + 1)) {
                      console.log(`${indent}  [AST Compare FAIL] FunctionDeclaration: name mismatch`); return false;
                 }
-                console.log(`${indent}  [FunctionDeclaration Compare] Names OK. Comparing parameters count...`);
+                console.log(`${indent}  [FunctionDeclaration Compare] Names OK. Params count: Doc=${funcA.parameters.length}, Find=${funcB.parameters.length}`);
                 if (funcA.parameters.length !== funcB.parameters.length) {
-                     console.log(`${indent}  [AST Compare FAIL] FunctionDeclaration: parameters length mismatch ${funcA.parameters.length} vs ${funcB.parameters.length}`); return false;
+                     console.log(`${indent}  [AST Compare FAIL] FunctionDeclaration: parameters length mismatch`); return false;
                 }
-                console.log(`${indent}  [FunctionDeclaration Compare] Params count OK (${funcA.parameters.length}). Comparing each parameter...`);
                 for (let i = 0; i < funcA.parameters.length; i++) {
                     if (!this.areNodesBasicallyEqual(funcA.parameters[i], funcB.parameters[i], sourceFileA, sourceFileB, depth + 1)) {
                          console.log(`${indent}  [AST Compare FAIL] FunctionDeclaration: parameter at index ${i} mismatch`); return false;
                     }
                 }
-                console.log(`${indent}  [FunctionDeclaration Compare] Params OK. Comparing body presence...`);
+                console.log(`${indent}  [FunctionDeclaration Compare] Params OK. Body presence: Doc=${!!funcA.body}, Find=${!!funcB.body}`);
                 if (!!funcA.body !== !!funcB.body) {
-                     console.log(`${indent}  [AST Compare FAIL] FunctionDeclaration: body presence mismatch (Doc: ${!!funcA.body}, Find: ${!!funcB.body})`); return false;
+                     console.log(`${indent}  [AST Compare FAIL] FunctionDeclaration: body presence mismatch`); return false;
                 }
-                console.log(`${indent}  [FunctionDeclaration Compare] Body presence OK. Comparing body content...`);
                 if (funcA.body && !this.areNodesBasicallyEqual(funcA.body, funcB.body, sourceFileA, sourceFileB, depth + 1)) { 
                      console.log(`${indent}  [AST Compare FAIL] FunctionDeclaration: body content mismatch`); return false;
                 }
-                console.log(`${indent}  [FunctionDeclaration Compare] Body OK. Functions are considered equal at this level.`);
+                console.log(`${indent}  [FunctionDeclaration Compare] Body OK.`);
                 break;
             }
-            case ts.SyntaxKind.Block: {
-                const blockA = nodeA as ts.Block;
-                const blockB = nodeB as ts.Block;
-                console.log(`${indent}  [Block Compare] Template statements: ${blockA.statements.length}, Candidate statements: ${blockB.statements.length}`);
-                if (blockA.statements.length > 0 && blockB.statements.length === 0) {
-                    console.log(`${indent}  [AST Compare FAIL] Block: Template has statements, candidate is empty.`);
+            case ts.SyntaxKind.Block: { 
+                const findBlock = nodeB as ts.Block;    
+                const docBlock = nodeA as ts.Block;     
+                console.log(`${indent}  [Block Compare] FindNode stmts: ${findBlock.statements.length}, DocNode stmts: ${docBlock.statements.length}`);
+                if (findBlock.statements.length > 0 && docBlock.statements.length === 0) {
+                    console.log(`${indent}  [AST Compare FAIL] Block: FindNode has statements, DocNode is empty.`);
                     return false;
                 }
-                if (blockA.statements.length > blockB.statements.length) {
-                    console.log(`${indent}  [AST Compare FAIL] Block: Template block has more statements (${blockA.statements.length}) than candidate block (${blockB.statements.length}).`);
+                if (findBlock.statements.length > docBlock.statements.length) {
+                    console.log(`${indent}  [AST Compare FAIL] Block: FindNode block has more statements (${findBlock.statements.length}) than DocNode block (${docBlock.statements.length}).`);
                     return false;
                 }
-                for (let i = 0; i < blockA.statements.length; i++) {
+                for (let i = 0; i < findBlock.statements.length; i++) {
                     console.log(`${indent}    [Block Compare] Comparing statement at index ${i}`);
-                    if (!this.areNodesBasicallyEqual(blockA.statements[i], blockB.statements[i], sourceFileA, sourceFileB, depth + 1)) {
-                        console.log(`${indent}    [AST Compare FAIL] Block: Statement at index ${i} mismatch (Kind Doc: ${ts.SyntaxKind[blockB.statements[i].kind]}, Kind Find: ${ts.SyntaxKind[blockA.statements[i].kind]})`);
+                    if (!this.areNodesBasicallyEqual(docBlock.statements[i], findBlock.statements[i], sourceFileA, sourceFileB, depth + 1)) {
+                        const findStmtKindText = findBlock.statements[i] ? ts.SyntaxKind[findBlock.statements[i].kind] : "undefined";
+                        const docStmtKindText = docBlock.statements[i] ? ts.SyntaxKind[docBlock.statements[i].kind] : "undefined";
+                        console.log(`${indent}    [AST Compare FAIL] Block: Statement at index ${i} mismatch (DocKind: ${docStmtKindText}, FindKind: ${findStmtKindText})`);
                         return false;
                     }
                 }
-                console.log(`${indent}  [Block Compare] All ${blockA.statements.length} template statements matched prefix of candidate block.`);
-                break;
+                console.log(`${indent}  [Block Compare] All ${findBlock.statements.length} FindNode statements matched prefix of DocNode block.`);
+                break; 
             }
             case ts.SyntaxKind.IfStatement: {
                 const ifA = nodeA as ts.IfStatement;
@@ -394,10 +395,10 @@ class CodeReplacerViewProvider implements vscode.WebviewViewProvider {
         return true;
     }
 
-    // --- Возвращаем highlightTextInEditor к поиску ОДНОГО стейтмента для отладки ---
+    // --- ОТКАТ highlightTextInEditor К ПОИСКУ ОДНОГО СТЕЙТМЕНТА ДЛЯ ОТЛАДКИ ---
     private highlightTextInEditor(textToFindFromWebview: string) {
         const editor = vscode.window.activeTextEditor;
-        console.log('[CodeReplacerTS] Highlighting text (AST-based, SINGLE statement matching). Editor active:', !!editor);
+        console.log('[CodeReplacerTS] Highlighting text (AST-based, SINGLE statement matching - DEBUG MODE). Editor active:', !!editor);
 
         if (!editor) {
             this.clearHighlights();
@@ -424,7 +425,7 @@ class CodeReplacerViewProvider implements vscode.WebviewViewProvider {
                 return;
             }
 
-            const findNodeToMatch = findStatements[0]; // Используем только первый стейтмент из поиска
+            const findNodeToMatch = findStatements[0]; // Ищем только первый стейтмент
             console.log(`[CodeReplacerTS AST] Attempting to match single statement from webview: Kind=${ts.SyntaxKind[findNodeToMatch.kind]}`);
             if (findStatements.length > 1) {
                 console.warn(`[CodeReplacerTS AST] WARNING: Webview provided ${findStatements.length} statements, but current logic only matches the first one for focused debugging.`);
@@ -434,7 +435,6 @@ class CodeReplacerViewProvider implements vscode.WebviewViewProvider {
             const documentSourceFile = ts.createSourceFile(editor.document.fileName, documentText, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
 
             const visit = (nodeInDocument: ts.Node) => {
-                // console.log(`[AST Visit] Visiting Doc Node: Kind=${ts.SyntaxKind[nodeInDocument.kind]}, Pos=${nodeInDocument.pos}-${nodeInDocument.end}`);
                 if (this.areNodesBasicallyEqual(nodeInDocument, findNodeToMatch, documentSourceFile, findSourceFile, 0)) { 
                     astMatchCount++;
                     console.log(`[AST Match FOUND] Doc Node Kind: ${ts.SyntaxKind[nodeInDocument.kind]}, Find Node Kind: ${ts.SyntaxKind[findNodeToMatch.kind]}`);
@@ -476,32 +476,29 @@ class CodeReplacerViewProvider implements vscode.WebviewViewProvider {
     }
 
     private async replaceTextInEditor_WithStringLogic(findTextFromWebview: string, replaceTextFromWebview: string) {
+        // ... (код без изменений) ...
         const editor = vscode.window.activeTextEditor;
         console.log('[CodeReplacerTS] Applying replace (current: string-based). Editor active:', !!editor);
         const normalizedFindText = normalizeText(findTextFromWebview); 
         const replaceText = replaceTextFromWebview;
-
         if (normalizedFindText.length === 0) { if (findTextFromWebview.length > 0) { vscode.window.showInformationMessage('Текст для поиска стал пустым после удаления пробелов. Замена не выполнена.'); } else { vscode.window.showInformationMessage('Поле "Код для поиска" не должно быть пустым.'); } return; }
         if (!editor) { vscode.window.showErrorMessage('Нет активного текстового редактора для замены.'); return; }
-        
         const document = editor.document;
         const originalDocumentText = document.getText();
         const normalizedDocumentText = normalizeText(originalDocumentText, false); 
         const firstOccurrenceIndexNormalized = normalizedDocumentText.indexOf(normalizedFindText);
         console.log('[CodeReplacerTS String Logic] indexOf for replacement (on normalized text) returned:', firstOccurrenceIndexNormalized);
-
         if (firstOccurrenceIndexNormalized === -1) { vscode.window.showInformationMessage(`Нормализованный код для поиска не найден в документе (строковый поиск).`); this.clearHighlights(); return; }
-        
         const originalStartIndex = this.getOriginalIndex(originalDocumentText, normalizedDocumentText, firstOccurrenceIndexNormalized);
         const originalEndIndex = this.getOriginalIndex(originalDocumentText, normalizedDocumentText, firstOccurrenceIndexNormalized + normalizedFindText.length);
         const rangeToReplace = new vscode.Range( document.positionAt(originalStartIndex), document.positionAt(originalEndIndex) );
         const success = await editor.edit(editBuilder => { editBuilder.replace(rangeToReplace, replaceText); });
-
         if (success) { console.log('[CodeReplacerTS String Logic] Text replaced successfully. Saving document...'); await document.save(); vscode.window.showInformationMessage('Код успешно заменен и файл сохранен (строковая замена)!'); this.clearHighlights(); }
         else { vscode.window.showErrorMessage('Не удалось выполнить замену текста (строковая замена).'); }
     }
 
     private getOriginalIndex(originalText: string, normalizedText: string, normalizedIndex: number): number {
+        // ... (код без изменений, все еще упрощенный) ...
         if (originalText === normalizedText) { return normalizedIndex; }
         let finalOriginalIndex = 0;
         let currentNormalizedCount = 0;
@@ -517,17 +514,18 @@ class CodeReplacerViewProvider implements vscode.WebviewViewProvider {
     }
 
     private _getHtmlForWebview(webview: vscode.Webview): string {
+        // ... (код без изменений) ...
         const nonce = getNonce();
         const stylesPath = vscode.Uri.joinPath(this._extensionUri, 'media', 'webview.css');
         const scriptPath = vscode.Uri.joinPath(this._extensionUri, 'media', 'webview.js');
         const stylesUri = webview.asWebviewUri(stylesPath);
         const scriptUri = webview.asWebviewUri(scriptPath);
-
         return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}'; img-src ${webview.cspSource} https:;"><link href="${stylesUri}" rel="stylesheet"><title>Code Replacer Controls</title></head><body><div class="container"><div class="input-group"><h2>Код для поиска:</h2><textarea id="findText" placeholder="Вставьте код, который нужно найти..."></textarea></div><div class="input-group"><h2>Код для замены:</h2><textarea id="replaceText" placeholder="Вставьте код, на который нужно заменить..."></textarea></div></div><div class="button-container"><button id="applyButton">Применить</button></div><script nonce="${nonce}" src="${scriptUri}"></script></body></html>`;
     }
 }
 
 function getNonce(): string {
+    // ... (код без изменений) ...
     let text = '';
     const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
     for (let i = 0; i < 32; i++) {
@@ -537,6 +535,7 @@ function getNonce(): string {
 }
 
 export function deactivate() {
+    // ... (код без изменений) ...
     console.log('[CodeReplacerTS] Extension "codereplacer" is now deactivated.');
     if (findDecorationType) {
         findDecorationType.dispose();
