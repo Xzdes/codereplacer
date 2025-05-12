@@ -1,4 +1,4 @@
-# Code Replacer TS
+# Code Replacer TS/JS
 
 A Visual Studio Code extension for finding and replacing code snippets in TypeScript and TSX files based on their Abstract Syntax Tree (AST) structure, rather than simple text matching. This allows for more robust refactoring by ignoring differences in whitespace, comments, and trivial formatting.
 
