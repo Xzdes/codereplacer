@@ -2,7 +2,7 @@
   "name": "codereplacer",
   "displayName": "Code Replacer TS",
   "description": "A code replacer extension built with TypeScript.",
-  "version": "0.0.1",
+  "version": "0.1.1",
   "engines": {
     "vscode": "^1.80.0"
   },

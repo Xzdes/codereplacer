@@ -8,8 +8,9 @@ import * as crypto from 'crypto';
 let findDecorationType: vscode.TextEditorDecorationType;
 let matchedASTRanges: vscode.Range[] = []; // Хранит диапазоны ПОЛНЫХ найденных последовательностей
 
+
 // --- AST Helper ---
-// ИЗМЕНЕНИЕ: Используем getPreEmitDiagnostics как ОБХОДНОЙ ПУТЬ для старых версий TS
+// ИСПОЛЬЗУЕМ getPreEmitDiagnostics СНОВА, так как getSyntacticDiagnostics недоступен
 function parseCodeToASTStatements(code: string, fileName: string = 'tempFile.ts'): ts.Statement[] {
     const sourceFile = ts.createSourceFile(
         fileName,
@@ -19,62 +20,81 @@ function parseCodeToASTStatements(code: string, fileName: string = 'tempFile.ts'
         ts.ScriptKind.TSX // Parse as TSX
     );
 
-    // ИЗМЕНЕНИЕ: Используем getPreEmitDiagnostics() вместо getSyntacticDiagnostics()
-    // ПРЕДУПРЕЖДЕНИЕ: Этот метод МЕНЕЕ эффективен и требует создания временной 'Program'.
-    // НАСТОЯТЕЛЬНО РЕКОМЕНДУЕТСЯ ОБНОВИТЬ ВЕРСИЮ TypeScript в package.json!
     let diagnostics: readonly ts.Diagnostic[] = [];
     try {
         // Создаем минимальную программу для получения диагностик
-        // Временное решение: передаем пустой host, т.к. файл уже есть в sourceFile
         const compilerHost: ts.CompilerHost = {
             getSourceFile: (fn, languageVersion) => fn === fileName ? sourceFile : undefined,
             getDefaultLibFileName: (options) => ts.getDefaultLibFilePath(options),
             writeFile: (fileName, data, writeByteOrderMark, onError) => { /* noop */ },
-            getCurrentDirectory: () => '', // Не имеет значения для этого случая
+            getCurrentDirectory: () => '', // Не имеет значения
             getDirectories: path => [],
             fileExists: fn => fn === fileName,
             readFile: fn => fn === fileName ? code : undefined,
             getCanonicalFileName: fn => fn,
             useCaseSensitiveFileNames: () => true,
             getNewLine: () => '\n',
-            resolveModuleNames: undefined, // не нужно для диагностики
-            resolveTypeReferenceDirectives: undefined // не нужно для диагностики
+            resolveModuleNames: undefined,
+            resolveTypeReferenceDirectives: undefined
         };
+        // Используем созданный host
         const program = ts.createProgram([fileName], { noEmit: true }, compilerHost);
-
-        // Получаем все диагностики (синтаксис + семантика, если получится)
         diagnostics = ts.getPreEmitDiagnostics(program, sourceFile);
     } catch (programError) {
         console.error("[CodeReplacerTS] Error creating temporary program for diagnostics:", programError);
-        // Если создание программы не удалось, просто вернем пустой массив диагностик
         diagnostics = [];
     }
-    // --- КОНЕЦ ИЗМЕНЕНИЯ ---
 
+    // Функция для форматирования диагностики (чтобы не дублировать код)
+    const formatDiagnostic = (diag: ts.Diagnostic): string => {
+        let message = ts.flattenDiagnosticMessageText(diag.messageText, '\n');
+        if (diag.file && diag.start !== undefined) {
+            try {
+                // Используем getLineAndCharacterOfPosition от sourceFile
+                const { line, character } = sourceFile.getLineAndCharacterOfPosition(diag.start);
+                const diagnosticFileName = diag.file ? diag.file.fileName : fileName;
+                message = `${diagnosticFileName} (${line + 1},${character + 1}): ${message}`;
+            } catch (e) {
+                console.warn("Could not get diagnostic position:", e instanceof Error ? e.message : String(e));
+            }
+        }
+        return message;
+    };
 
     if (diagnostics.length > 0) {
-        // Указываем тип для diag
-        const errors = diagnostics.map((diag: ts.Diagnostic) => {
-            let message = ts.flattenDiagnosticMessageText(diag.messageText, '\n');
-            if (diag.file && diag.start !== undefined) {
-                try {
-                    // Используем getLineAndCharacterOfPosition от исходного файла, не из программы
-                    const { line, character } = sourceFile.getLineAndCharacterOfPosition(diag.start);
-                     // Имя файла лучше брать из diag.file, если оно есть
-                    const diagnosticFileName = diag.file ? diag.file.fileName : fileName;
-                    message = `${diagnosticFileName} (${line + 1},${character + 1}): ${message}`;
-                } catch (e) {
-                    // Ошибка получения позиции может случиться, если diag.start некорректен
-                    console.warn("Could not get diagnostic position:", e instanceof Error ? e.message : String(e));
-                }
+        // Фильтруем ожидаемые ошибки
+        const relevantDiagnostics = diagnostics.filter(diag => {
+            const cannotFindNameCodes = [2304, 2552];
+            // Проверяем и код ошибки, и текст для глобальных типов
+            if (diag.code === 2304 && typeof diag.messageText === 'string' &&
+                (diag.messageText.startsWith('Cannot find name') || diag.messageText.startsWith('Cannot find global type'))) {
+                return false;
             }
-            return message;
-        }).join('\n');
-        console.warn(`[CodeReplacerTS] AST Parsing Diagnostics for ${fileName}:\n${errors}`);
+            if (cannotFindNameCodes.includes(diag.code) && typeof diag.messageText === 'string' && diag.messageText.startsWith('Cannot find name')) return false;
+            if (diag.code === 6053) return false; // lib not found
+             // Дополнительно: Исключаем ошибки о невозможности найти модуль (если код поиска содержит import/require)
+             if (diag.code === 2307) return false; // Cannot find module '...' or its corresponding type declarations.
+            return true; // Оставляем остальные
+        });
+
+        if (relevantDiagnostics.length > 0) {
+            // Форматируем только релевантные ошибки для лога предупреждений
+            const errorsToShow = relevantDiagnostics.map(formatDiagnostic).join('\n');
+            console.warn(`[CodeReplacerTS] Relevant AST Parsing Diagnostics for ${fileName}:\n${errorsToShow}`);
+
+            // Показываем пользователю только первую релевантную ошибку
+            const firstRelevantError = relevantDiagnostics[0];
+            let userMessage = ts.flattenDiagnosticMessageText(firstRelevantError.messageText, '\n');
+            vscode.window.showWarningMessage(`Syntax error in code to find: ${userMessage}`);
+        } else if (diagnostics.length > 0) {
+            // Если были только нерелевантные ошибки, логируем их все для отладки
+            // ИСПРАВЛЕНИЕ: Добавляем callback в map
+            const allErrors = diagnostics.map(formatDiagnostic).join('\n');
+            console.log(`[CodeReplacerTS] All AST Parsing Diagnostics (incl. expected 'cannot find name', etc.) for ${fileName}:\n${allErrors}`);
+        }
     }
     return Array.from(sourceFile.statements);
 } // Конец функции parseCodeToASTStatements
-
 
 // --- Normalization Helper ---
 function normalizeText(text: string, trimEdges: boolean = true): string {
