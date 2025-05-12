@@ -1,6 +1,6 @@
 {
   "name": "codereplacer",
-  "displayName": "Code Replacer TS",
+  "displayName": "Code Replacer",
   "description": "A code replacer extension built with TypeScript.",
   "version": "0.1.1",
   "engines": {
@@ -53,8 +53,12 @@
     "@typescript-eslint/eslint-plugin": "^8.31.1",
     "@typescript-eslint/parser": "^8.31.1",
     "eslint": "^9.25.1",
-    "typescript": "^5.8.3",
+    
     "@vscode/test-cli": "^0.0.10",
     "@vscode/test-electron": "^2.5.2"
+  },
+  "dependencies": {
+    "typescript": "^5.8.3"
+
   }
 }
