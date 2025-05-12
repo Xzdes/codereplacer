@@ -97,3 +97,28 @@ button:active {
     flex-grow: 1; /* Каждая группа будет стараться занять равное место */
     min-height: 0; /* Необходимо для правильной работы flex-grow с textarea */
 }
+
+/* --- Стили для нового чекбокса --- */
+.options-container {
+    margin-top: 8px; /* Небольшой отступ сверху от textarea */
+    padding: 5px 0;  /* Небольшой вертикальный padding */
+}
+
+.options-container label {
+    display: flex;
+    align-items: center; /* Выравнивает чекбокс и текст по вертикали */
+    font-size: 0.9em;    /* Чуть меньше основного текста */
+    color: var(--vscode-descriptionForeground, var(--vscode-editor-foreground)); /* Цвет текста, как у small или основной */
+    cursor: pointer;
+    user-select: none; /* Предотвращает выделение текста метки при клике */
+}
+
+.options-container input[type="checkbox"] {
+    margin-right: 8px; /* Отступ справа от чекбокса до текста */
+    /* Используем accent-color для стилизации самого чекбокса в современных браузерах */
+    accent-color: var(--vscode-button-background, #007acc); /* Цвет галочки и фона при активации */
+    /* Для более старых браузеров или для кастомного вида можно использовать псевдоэлементы */
+    width: 16px; /* Примерный размер */
+    height: 16px; /* Примерный размер */
+    cursor: pointer;
+}

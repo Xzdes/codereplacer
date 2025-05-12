@@ -1,45 +1,24 @@
 // src/webviewProvider.ts
 import * as vscode from 'vscode';
-import { generateWebviewHtml } from './webviewUtils'; // Утилита для генерации HTML
-import { highlightTextInEditor, replaceFoundMatches, clearHighlights } from './editorActions'; // Основные действия с редактором
+import { generateWebviewHtml } from './webviewUtils';
+import { highlightTextInEditor, replaceFoundMatches, clearHighlights } from './editorActions';
 
-/**
- * Предоставляет и управляет Webview для инструмента поиска и замены кода.
- * Отображает UI (поля ввода, кнопка) и обрабатывает взаимодействие пользователя,
- * делегируя основные операции модулю editorActions.
- */
 export class CodeReplacerViewProvider implements vscode.WebviewViewProvider {
-
-    /**
-     * Идентификатор типа для этого Webview View. Должен совпадать с `id` в `package.json`.
-     */
     public static readonly viewType = 'codereplacer.view';
 
-    private _view?: vscode.WebviewView; // Ссылка на текущий экземпляр WebviewView
-    private readonly _extensionUri: vscode.Uri; // URI расширения для доступа к ресурсам
+    private _view?: vscode.WebviewView;
+    private readonly _extensionUri: vscode.Uri;
 
-    // Последние полученные значения из полей ввода Webview (для передачи в highlight)
-    private _lastFindText: string = '';
-    private _lastReplaceText: string = '';
+    // --- Сохраненные состояния из Webview ---
+    private _currentFindText: string = '';
+    private _currentReplaceText: string = '';
+    private _currentIgnoreIdentifiers: boolean = false;
 
-
-    /**
-     * Создает экземпляр провайдера.
-     * @param {vscode.Uri} extensionUriValue URI корневой папки расширения.
-     */
     constructor(private readonly extensionUriValue: vscode.Uri) {
         this._extensionUri = extensionUriValue;
-         console.log('[CodeReplacerTS Provider] Instance created.');
+        console.log('[CodeReplacerTS Provider] Instance created.');
     }
 
-    /**
-     * Вызывается VS Code, когда необходимо отобразить или восстановить Webview.
-     * Настраивает Webview, устанавливает его HTML-содержимое и настраивает обработчики сообщений.
-     *
-     * @param {vscode.WebviewView} webviewView Экземпляр WebviewView.
-     * @param {vscode.WebviewViewResolveContext} context Контекст разрешения.
-     * @param {vscode.CancellationToken} _token Токен отмены.
-     */
     public resolveWebviewView(
         webviewView: vscode.WebviewView,
         context: vscode.WebviewViewResolveContext,
@@ -48,108 +27,99 @@ export class CodeReplacerViewProvider implements vscode.WebviewViewProvider {
         console.log('[CodeReplacerTS Provider] Resolving webview view.');
         this._view = webviewView;
 
-        // Настройка параметров Webview
         webviewView.webview.options = {
-            // Разрешить выполнение скриптов в Webview
             enableScripts: true,
-            // Ограничить доступ Webview к локальным ресурсам только папкой 'media'
-            localResourceRoots: [vscode.Uri.joinPath(this._extensionUri, 'media')]
+            localResourceRoots: [vscode.Uri.joinPath(this._extensionUri, 'media')],
         };
 
-        // Установка HTML-контента для Webview
-        // Используем утилиту для генерации HTML
         webviewView.webview.html = generateWebviewHtml(webviewView.webview, this._extensionUri);
         console.log('[CodeReplacerTS Provider] HTML content set for WebviewView.');
 
-        // Обработка сообщений, полученных от Webview (из webview.js)
         webviewView.webview.onDidReceiveMessage(
-            async (message: { command: string; text?: string; findText?: string; replaceText?: string }) => {
-                console.log('[CodeReplacerTS Provider] Received message from webview:', message.command, message); // Логируем всё сообщение для отладки
+            async (message: {
+                command: string;
+                text?: string;
+                findText?: string;
+                replaceText?: string;
+                ignoreIdentifiers?: boolean;
+            }) => {
+                console.log('[CodeReplacerTS Provider] Received message from webview:', message.command, JSON.stringify(message));
 
+                // 1. Обновляем внутреннее состояние на основе пришедшего сообщения.
+                if (message.command === 'findText' && typeof message.text === 'string') {
+                    this._currentFindText = message.text;
+                }
+                if (message.command === 'updateReplaceText' && typeof message.text === 'string') {
+                    this._currentReplaceText = message.text;
+                }
+                if (typeof message.ignoreIdentifiers === 'boolean') { // Обновляем всегда, если пришло
+                    this._currentIgnoreIdentifiers = message.ignoreIdentifiers;
+                }
+
+                // Для команды applyReplace, тексты могут приходить в отдельных полях findText и replaceText.
+                if (message.command === 'applyReplace') {
+                    if (typeof message.findText === 'string') {
+                        this._currentFindText = message.findText; // Хотя findText не используется в replaceFoundMatches, сохраняем для консистентности
+                    }
+                    if (typeof message.replaceText === 'string') {
+                        this._currentReplaceText = message.replaceText;
+                    }
+                }
+
+                // 2. Выполняем действия в зависимости от команды
                 switch (message.command) {
-                    // Сообщение приходит при изменении текста в поле "Code to Find" (с дебаунсом)
                     case 'findText':
-                        if (typeof message.text === 'string') {
-                            this._lastFindText = message.text; // Сохраняем последнее значение
-                             // Запускаем подсветку, передавая оба значения для предпросмотра в hover
-                            highlightTextInEditor(this._lastFindText, this._lastReplaceText);
-                        } else {
-                             console.warn('[CodeReplacerTS Provider] "findText" command received without text.');
+                    case 'updateReplaceText':
+                        // Для этих команд всегда используем актуальные _currentFindText, _currentReplaceText, _currentIgnoreIdentifiers
+                        // Для updateReplaceText, подсветка имеет смысл только если есть текст для поиска.
+                        if (this._currentFindText.trim() || message.command === 'findText') {
+                            console.log(`[CodeReplacerTS Provider] Calling highlightTextInEditor with find: "${this._currentFindText.substring(0,30)}...", replace: "${this._currentReplaceText.substring(0,30)}...", ignoreIdentifiers: ${this._currentIgnoreIdentifiers}`);
+                            await highlightTextInEditor(
+                                this._currentFindText,
+                                this._currentReplaceText,
+                                this._currentIgnoreIdentifiers
+                            );
+                        } else if (!this._currentFindText.trim() && message.command === 'updateReplaceText') {
+                            console.log('[CodeReplacerTS Provider] updateReplaceText received, but find text is empty. No highlight update.');
                         }
                         break;
 
-                    // Сообщение приходит при изменении текста в поле "Replacement Code"
-                    // ДОБАВЛЕНО: Новый обработчик для обновления предпросмотра при изменении текста замены
-                    case 'updateReplaceText': // Предполагаем, что webview.js будет отправлять это сообщение
-                        if (typeof message.text === 'string') {
-                            this._lastReplaceText = message.text; // Сохраняем последнее значение
-                            // Если в поле поиска уже что-то есть, обновляем подсветку (и hover messages)
-                            if (this._lastFindText.trim()) {
-                                highlightTextInEditor(this._lastFindText, this._lastReplaceText);
-                            }
-                        } else {
-                             console.warn('[CodeReplacerTS Provider] "updateReplaceText" command received without text.');
-                        }
-                        break;
-
-                    // Сообщение приходит при нажатии кнопки "Replace Found Matches"
                     case 'applyReplace':
-                        // Используем текст замены из сообщения, если он есть, иначе последний сохраненный
-                        const replaceText = typeof message.replaceText === 'string' ? message.replaceText : this._lastReplaceText;
-                        // Обновляем сохраненные значения на всякий случай
-                        if (typeof message.findText === 'string') this._lastFindText = message.findText;
-                        this._lastReplaceText = replaceText;
-
-                         // Выполняем замену
-                        await replaceFoundMatches(replaceText);
+                        // Функция replaceFoundMatches ожидает ОДИН аргумент: текст для замены.
+                        // Используем this._currentReplaceText, которое было обновлено из message.replaceText
+                        // (если оно присутствовало в сообщении) на шаге 1.
+                        console.log(`[CodeReplacerTS Provider] Calling replaceFoundMatches with replace text: "${this._currentReplaceText.substring(0,30)}..."`);
+                        await replaceFoundMatches(this._currentReplaceText); // Только один аргумент!
+                        
+                        // Опционально: после замены можно очистить поля ввода в webview
+                        // this._view?.webview.postMessage({ command: 'clearInputs' });
+                        // И сбросить внутренние состояния (хотя clearHighlights уже очищает matchedResults)
+                        // this._currentFindText = '';
+                        // this._currentReplaceText = '';
+                        // this._currentIgnoreIdentifiers = false;
                         break;
 
-                    // Сообщение для отображения простого информационного окна
                     case 'alert':
                         if (typeof message.text === 'string') {
                             vscode.window.showInformationMessage(message.text);
                         }
                         break;
 
-                    // Неизвестная команда
                     default:
                         console.warn(`[CodeReplacerTS Provider] Received unknown command from webview: ${message.command}`);
                 }
             }
         );
 
-        // Обработка события уничтожения Webview (например, при закрытии панели)
         webviewView.onDidDispose(() => {
             console.log('[CodeReplacerTS Provider] WebviewView disposed.');
-            // Очищаем подсветку во всех редакторах при закрытии панели
-            clearHighlights(undefined); // Передаем undefined для очистки во всех видимых редакторах
-            this._view = undefined; // Сбрасываем ссылку на Webview
-            this._lastFindText = ''; // Сбрасываем сохраненные значения
-            this._lastReplaceText = '';
-        }, null /* thisArg */); // Добавляем null для thisArg, если не используется
+            clearHighlights(undefined);
+            this._view = undefined;
+            this._currentFindText = '';
+            this._currentReplaceText = '';
+            this._currentIgnoreIdentifiers = false;
+        }, null);
 
-        // --- Добавлено: Очистка подсветки при показе View ---
-        // Если View становится видимым (например, пользователь переключился на вкладку расширения),
-        // очистим подсветку, так как пользователь, вероятно, хочет начать новый поиск.
-        // webviewView.onDidChangeVisibility(() => {
-        //     if (webviewView.visible) {
-        //         console.log('[CodeReplacerTS Provider] Webview became visible, clearing highlights.');
-        //         clearHighlights(undefined);
-        //         // Можно также очистить поля ввода в webview, отправив сообщение
-        //         // this._view?.webview.postMessage({ command: 'clearInputs' });
-        //     }
-        // });
-
-         console.log('[CodeReplacerTS Provider] Webview event listeners configured.');
+        console.log('[CodeReplacerTS Provider] Webview event listeners configured.');
     }
-
-     // --- Методы, которые были перемещены в editorActions или другие утилиты, УДАЛЕНЫ ---
-     // private areNodesBasicallyEqual(...) { /* ... */ }
-     // private compareNodeArrays(...) { /* ... */ }
-     // private compareModifiers(...) { /* ... */ }
-     // private isTriviaNode(...) { /* ... */ }
-     // private highlightTextInEditor(...) { /* ... */ }
-     // private replaceFoundMatches(...) { /* ... */ }
-     // public clearHighlights(...) { /* ... */ }
-     // private _getHtmlForWebview(...) { /* ... */ }
 }

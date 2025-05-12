@@ -42,7 +42,7 @@ export function generateWebviewHtml(webview: vscode.Webview, extensionUri: vscod
     // - script-src 'nonce-${nonce}': Разрешает выполнение скриптов с указанным nonce.
     // - img-src ${webview.cspSource} https: : Разрешает изображения из источников VS Code и по HTTPS.
     // - connect-src 'self': Разрешает Webview отправлять запросы к самому себе (например, через postMessage).
-    return `<!DOCTYPE html>
+   return `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -60,23 +60,34 @@ export function generateWebviewHtml(webview: vscode.Webview, extensionUri: vscod
 </head>
 <body>
     <div class="container">
+
+        <!-- Блок для "Code to Find" -->
         <div class="input-group">
             <h2>Code to Find:</h2>
             <textarea id="findText" placeholder="Paste code snippet..." rows="8"></textarea>
             <small>Uses AST for TS/JS, text compare for others.</small>
+            <div class="options-container">
+                <label for="ignoreIdentifiersCheckbox">
+                    <input type="checkbox" id="ignoreIdentifiersCheckbox" name="ignoreIdentifiers">
+                    Ignore variable/function names (AST mode)
+                </label>
+            </div>
         </div>
+
+        <!-- Блок для "Replacement Code" (ВОССТАНОВЛЕН/ПРОВЕРЕН) -->
         <div class="input-group">
             <h2>Replacement Code:</h2>
             <textarea id="replaceText" placeholder="Paste replacement code..." rows="8"></textarea>
-            <small>Leave empty to delete found code.</small> <!-- Добавлено пояснение -->
+            <small>Leave empty to delete found code.</small>
         </div>
+        <!-- Конец блока для "Replacement Code" -->
+
     </div>
 
     <div class="button-container">
         <button id="applyButton">Replace Found Matches</button>
     </div>
 
-    <!-- Подключение скрипта webview с nonce -->
     <script nonce="${nonce}" src="${scriptUri}"></script>
 </body>
 </html>`;
