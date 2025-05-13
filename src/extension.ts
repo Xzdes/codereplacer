@@ -1,5 +1,6 @@
 // src/extension.ts
 import * as vscode from 'vscode';
+// import fetch from 'node-fetch'; // Этот импорт здесь не используется, но может быть оставлен если планируется
 import { CodeReplacerViewProvider } from './webviewProvider'; // Импорт нашего провайдера Webview
 import { initializeDecoration, clearState } from './state'; // Импорт функций управления состоянием
 import { clearHighlights } from './editorActions'; // Импорт функции очистки подсветки
@@ -27,7 +28,8 @@ export function activate(context: vscode.ExtensionContext): void {
 
     // 2. Создание экземпляра провайдера Webview
     // Передаем URI расширения для доступа к ресурсам (media/)
-    const provider = new CodeReplacerViewProvider(context.extensionUri);
+    // И ПЕРЕДАЕМ КОНТЕКСТ РАСШИРЕНИЯ
+    const provider = new CodeReplacerViewProvider(context.extensionUri, context); // Pass context
     console.log('[CodeReplacerTS] Webview provider instance created.');
 
     // 3. Регистрация провайдера Webview
@@ -58,12 +60,23 @@ export function activate(context: vscode.ExtensionContext): void {
         clearHighlights(undefined);
     });
 
-    // Добавляем слушателя в подписки для автоматического удаления при деактивации.
-    context.subscriptions.push(editorChangeListener);
-    console.log('[CodeReplacerTS] Active editor change listener added.');
+    // 5. Регистрация команды для установки API ключа
+    const setApiKeyCommand = vscode.commands.registerCommand('codereplacer.setApiKey', async () => {
+        // Теперь provider имеет доступ к context и может использовать SecretStorage
+        // или промпт для ввода ключа может быть реализован здесь и передан provider'у,
+        // но лучше, если provider сам управляет этим, имея context.
+        // Убедимся, что `provider` существует и у него есть метод для этого.
+        // В `CodeReplacerViewProvider` должен быть публичный метод, например, `promptAndStoreApiKey`.
+        await provider.promptAndStoreApiKey();
+    });
+
+    // Добавляем слушателя и команду в подписки для автоматического удаления при деактивации.
+    context.subscriptions.push(editorChangeListener, setApiKeyCommand);
+    console.log('[CodeReplacerTS] Active editor change listener and setApiKey command added to subscriptions.');
 
     console.log('[CodeReplacerTS] Extension "codereplacer-ts" is now active!');
 }
+
 
 /**
  * Деактивирует расширение.
@@ -76,3 +89,4 @@ export function deactivate(): void {
     clearState();
     console.log('[CodeReplacerTS] Extension deactivated and state cleared.');
 }
+// Лишняя скобка была здесь, теперь она удалена.

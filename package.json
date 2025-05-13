@@ -2,7 +2,7 @@
   "name": "codereplacer",
   "displayName": "Code Replacer",
   "description": "A code replacer extension built with TypeScript.",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "engines": {
     "vscode": "^1.80.0"
   },
@@ -14,6 +14,13 @@
   ],
   "main": "./out/extension.js",
   "contributes": {
+    "commands": [ 
+        {
+            "command": "codereplacer.setApiKey",
+            "title": "Code Replacer: Set API Key",
+            "category": "CodeReplacer" 
+        }
+    ],
     "viewsContainers": {
       "activitybar": [
         {
@@ -30,7 +37,7 @@
           "name": "Code Replacer",
           "type": "webview"
         }
-      ]
+      ]   
     }
   },
   "scripts": {
@@ -48,7 +55,7 @@
   "license": "MIT",
   "devDependencies": {
     "@types/mocha": "^10.0.10",
-    "@types/node": "20.x",
+    "@types/node": "^20.17.46",
     "@types/string-similarity": "^4.0.2",
     "@types/vscode": "^1.80.0",
     "@typescript-eslint/eslint-plugin": "^8.31.1",
@@ -58,6 +65,7 @@
     "eslint": "^9.25.1"
   },
   "dependencies": {
+    "node-fetch": "^3.3.2",
     "string-similarity": "^4.0.4",
     "typescript": "^5.8.3"
   }

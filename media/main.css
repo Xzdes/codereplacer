@@ -1,0 +1,37 @@
+/* media/main.css */
+.settings {
+    margin-bottom: 20px;
+}
+
+.settings label {
+    display: block;
+    margin-bottom: 5px;
+}
+
+.settings input[type="text"] {
+    width: 300px;
+    padding: 5px;
+    margin-bottom: 10px;
+}
+
+.replacements ul {
+    list-style: none;
+    padding: 0;
+}
+
+.replacements li {
+    margin-bottom: 5px;
+}
+
+.add-replacement input[type="text"] {
+    width: 200px;
+    padding: 5px;
+    margin-right: 10px;
+}
+
+.generate-replacement textarea {
+    width: 100%;
+    height: 100px;
+    padding: 5px;
+    margin-bottom: 10px;
+}
